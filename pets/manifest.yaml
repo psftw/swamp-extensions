@@ -1,0 +1,322 @@
+manifestVersion: 1
+name: "@psftw/pets"
+version: "2026.08.12.1"
+repository: "https://github.com/psftw/swamp-extensions"
+description: |
+  Minimalist configuration management for "pet" Debian Linux servers. Declare
+  intent with primitives, group primitives into a `role`, then `check`/`apply`
+  across a fleet.
+
+  🤖 experimental 🤖
+
+  > This was built to learn about swamp extensions, don't use it!
+
+  Every model takes a `fleet` (`@swamp/ssh` model instance), and a `hosts`
+  selector (`all`, `name:X`, `tag:Y`). Convergence logic streams to each host's
+  `python3` over SSH stdin; nothing is installed on the targets. `check` is
+  read-only; `apply` converges with sudo. Statuses: `compliant`, `non_compliant`,
+  `applied` (real changes made), `failed`.
+
+  ## Quickstart by example: PostgreSQL from PGDG repositories
+
+  Define a fleet:
+
+  ```bash
+  swamp extension pull @swamp/ssh
+  swamp model create @swamp/ssh my-fleet
+  swamp model edit my-fleet
+  ```
+
+  ```yaml
+  transport:
+    kind: ssh
+    user: debian
+    identityFile: ~/.ssh/id_ed25519
+  hosts:
+    - name: build
+      address: build.example.com
+      tags: [build]
+  ```
+
+  Declare our APT repository (see: [PGDG](https://wiki.postgresql.org/wiki/Apt)):
+
+  ```bash
+  swamp model create @psftw/pets/apt-repository pgdg-repo
+  swamp model edit pgdg-repo
+  ```
+
+  ```yaml
+  fleet: my-fleet
+  name: pgdg-repo
+  uris: [https://apt.postgresql.org/pub/repos/apt]
+  suites: [trixie-pgdg]
+  components: [main]
+  gpgKeyUrl: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+  signedBy: /etc/apt/keyrings/pgdg.asc
+  ```
+
+  Declare our package install:
+
+  ```bash
+  swamp model create @psftw/pets/apt postgres-package
+  swamp model edit postgres-package
+  ```
+
+  ```yaml
+  fleet: my-fleet
+  packages:
+    - postgresql-18
+  ```
+
+  Sequence these into a `role`:
+
+  ```bash
+  swamp model create @psftw/pets/role postgres-role
+  swamp model edit postgres-role
+  ```
+
+  ```yaml
+  fleet: my-fleet
+  members:
+    - pgdg-repo
+    - postgres-package
+  ```
+
+  Apply the `role` to our server:
+
+  ```bash
+  swamp model method run postgres-role apply --input hosts=all
+  [INF] @psftw/pets/role·apply: [1/2] pgdg-repo: apply on all
+  [INF] @psftw/pets/apt-repository·apply: running on all via my-fleet (sudo)
+  [INF] @psftw/pets/apt-repository·apply: build: applied — write /etc/apt/sources.list.d/pgdg-repo.sources; fetch key to /etc/apt/keyrings/pgdg.asc
+  [INF] @psftw/pets/role·apply: [1/2] pgdg-repo: applied=1
+  [INF] @psftw/pets/role·apply: [2/2] postgres-package: apply on all
+  [INF] @psftw/pets/apt·apply: running on all via my-fleet (sudo)
+  [INF] @psftw/pets/apt·apply: build: applied — install postgresql-18
+  [INF] @psftw/pets/role·apply: [2/2] postgres-package: applied=1
+  [INF] @psftw/pets/role·apply: build: applied — pgdg-repo: write /etc/apt/sources.list.d/pgdg-repo.sources; pgdg-repo: fetch key to /etc/apt/keyrings/pgdg.asc; postgres-package: install postgresql-18
+  [INF] @psftw/pets/role·apply: summary[all]: applied
+  ```
+
+  View the compliance report:
+
+  ```bash
+  swamp report get @psftw/pets/fleet-compliance --model postgres-role
+  ```
+
+  > Fleet compliance — postgres-role · apply (succeeded)
+
+  **Aggregate:** `applied` across 1 host(s) — selector `all` —
+  2026-08-11T00:00:00.000Z
+
+  | Host  | Status    | Changes |
+  | ----- | --------- | ------- |
+  | build | `applied` | 3       |
+
+  Members
+
+  | Host  | Member           | Status    |
+  | ----- | ---------------- | --------- |
+  | build | pgdg-repo        | `applied` |
+  | build | postgres-package | `applied` |
+
+  Changes
+
+  - build: pgdg-repo: write /etc/apt/sources.list.d/pgdg-repo.sources
+  - build: pgdg-repo: fetch key to /etc/apt/keyrings/pgdg.asc
+  - build: postgres-package: install postgresql-18
+
+  ## Models
+
+  ### `@psftw/pets/role`
+
+  Sequences member models' check/apply across the fleet and rolls their per-host states into one aggregate state plus a selector-keyed summary.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `requireCharDevices` | string[] (default: []) | Character devices that must exist; apply refuses without them |
+  | `members` | string[] (required) | Granular @psftw/pets model instances (each implementing check and apply), in execution order |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Run every member's check and roll up per-host drift (read-only, no sudo)
+  - `apply` — Verify required devices, then run every member's apply in order (sudo)
+
+  **Resources**
+
+  - `state` — Per-host aggregate role compliance (member states hold detail). Fields: `status` "compliant" | "non_compliant" | "applied" | "failed", `changes` string[], `members` map<string, string>, `error` string | null, `timestamp` string
+  - `summary` — Selector-keyed roll-up across all hosts (stable name for CEL/data.latest consumers). Fields: `status` "compliant" | "non_compliant" | "applied" | "failed", `hosts` map<string, string>, `error` string | null, `timestamp` string
+
+  Every run renders `@psftw/pets/fleet-compliance`.
+
+  ### `@psftw/pets/apt`
+
+  Ensures Debian packages are installed on every host in the fleet.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `packages` | string[] (required) | Packages that must be installed |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Report missing packages, flagging any without an install candidate (read-only, no sudo)
+  - `apply` — Refresh the apt index and install missing packages (sudo); no-op when compliant
+
+  **Resources**
+
+  - `state` — Per-host package compliance. Fields: `packages` string[], `missing` string[], `status` "compliant" | "non_compliant" | "applied" | "failed", `changes` string[], `error` string | null, `timestamp` string
+
+  ### `@psftw/pets/apt-repository`
+
+  Manages a deb822 `.sources` apt repository entry and its signing key.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `name` | string (required) | Filename stem for /etc/apt/sources.list.d/<name>.sources |
+  | `uris` | string[] (required) | Repository base URLs |
+  | `suites` | string[] (required) | Distribution suites (e.g. trixie-pgdg) |
+  | `components` | string[] (required) | Repository components (e.g. main) |
+  | `architectures` | string[] (optional) | Restrict to these architectures |
+  | `gpgKeyUrl` | string (uri, optional) | Key fetched to signedBy when absent (.asc target: stored armored as-is) |
+  | `signedBy` | string (optional) | Keyring path referenced by Signed-By |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Compare .sources content hash and key presence (read-only, no sudo)
+  - `apply` — Install the .sources file and fetch the signing key if absent (sudo); no-op when compliant
+
+  **Resources**
+
+  - `state` — Per-host apt source compliance. Fields: `path` string, `status` "compliant" | "non_compliant" | "applied" | "failed", `sourcesMatch` boolean, `keyPresent` boolean, `changes` string[], `error` string | null, `timestamp` string
+
+  ### `@psftw/pets/directory`
+
+  Ensures directories exist with the desired owner, group, and mode.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `dirs` | {path, owner, group, mode}[] (required) | Directories that must exist |
+  | `dirs[].path` | string (required) | Absolute directory path |
+  | `dirs[].owner` | string (required) | Owning user |
+  | `dirs[].group` | string (required) | Owning group |
+  | `dirs[].mode` | string (required) | Octal mode (e.g. "0750") |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Report drift on all managed directories (read-only, no sudo)
+  - `apply` — mkdir/chown/chmod drifted directories (sudo); refuses non-directory paths
+
+  **Resources**
+
+  - `state` — Per-host directory compliance. Fields: `status` "compliant" | "non_compliant" | "applied" | "failed", `dirs` {path, ok, detail}[], `changes` string[], `error` string | null, `timestamp` string
+
+  ### `@psftw/pets/group-member`
+
+  Append-only supplementary group membership over the fleet.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `username` | string (required) | User whose membership is managed |
+  | `group` | string (required) | Supplementary group the user must belong to |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Report whether the user is in the group (read-only, no sudo)
+  - `apply` — Append the user to the group with usermod -aG (sudo)
+
+  **Resources**
+
+  - `state` — Per-host membership compliance. Fields: `username` string, `group` string, `status` "compliant" | "non_compliant" | "applied" | "failed", `member` boolean, `groups` string[], `changes` string[], `error` string | null, `timestamp` string
+
+  ### `@psftw/pets/systemd`
+
+  Ensures a systemd unit's enabled-at-boot and running/stopped state.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `service` | string (required) | Unit name (e.g. nginx or getty@tty1) |
+  | `enabled` | boolean (required) | Unit must be enabled at boot |
+  | `ensure` | "running" \| "stopped" (required) | Desired active state |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Report unit enabled/active drift (read-only, no sudo)
+  - `apply` — systemctl enable/disable + start/stop to match desired state (sudo)
+
+  **Resources**
+
+  - `state` — Per-host unit state compliance. Fields: `service` string, `status` "compliant" | "non_compliant" | "applied" | "failed", `enabled` string, `active` string, `changes` string[], `error` string | null, `timestamp` string
+
+  ### `@psftw/pets/template-file`
+
+  Installs a Liquid-rendered file atomically, with optional validate and onChange hooks.
+
+  **Configuration**
+
+  | field | type | description |
+  | --- | --- | --- |
+  | `fleet` | string (required) | @swamp/ssh model providing inventory and transport |
+  | `path` | string (required) | Destination file on the host |
+  | `templatePath` | string (required) | Liquid template, relative to the repo root |
+  | `owner` | string (required) | File owner |
+  | `group` | string (required) | File group |
+  | `mode` | string (required) | Octal mode (e.g. "0644") |
+  | `variables` | map<string, any> (default: {}) | Extra render-context values, merged with per-host `host` |
+  | `validateCommand` | string (optional) | Run against the staged file as $FILE before install (e.g. nft -c -f "$FILE") |
+  | `onChange` | string (optional) | Run after install, only when the content hash changed |
+
+  **Methods** — each takes `hosts` (string): Fleet host selector (name:X or tag:Y)
+
+  - `check` — Render locally and compare remote hash/owner/mode (read-only, no sudo)
+  - `apply` — Stage, validate, atomically install, run onChange when the hash changed (sudo)
+
+  **Resources**
+
+  - `state` — Per-host rendered-file compliance. Fields: `path` string, `status` "compliant" | "non_compliant" | "applied" | "failed", `contentMatch` boolean, `expectedHash` string, `actualHash` string, `changes` string[], `error` string | null, `timestamp` string
+
+  ## Reports
+
+  ### `@psftw/pets/fleet-compliance`
+
+  Per-host role compliance: aggregate, member statuses, and changes.
+
+  Rendered automatically after every `@psftw/pets/role` run; fetch with `swamp report get @psftw/pets/fleet-compliance --model <name>`.
+dependencies:
+  - "@swamp/ssh"
+models:
+  - role.ts
+  - apt.ts
+  - apt_repository.ts
+  - directory.ts
+  - group_member.ts
+  - systemd.ts
+  - template_file.ts
+reports:
+  - fleet_compliance.ts
+additionalFiles:
+  - README.md
+  - LICENSE.md
+labels:
+  - ssh
+  - debian
+  - bootstrap
+  - configuration
+  - systemd

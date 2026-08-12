@@ -1,0 +1,31 @@
+{
+  "tasks": {
+    "gen": "deno run --allow-read --allow-write scripts/gen_payloads.ts",
+    "gen:docs": "deno run --allow-read --allow-write scripts/gen_docs.ts",
+    "check": "deno check extensions/models/*.ts extensions/models/_lib/*.ts extensions/reports/*.ts scripts/*.ts",
+    "test": "deno test --allow-read extensions/models/ extensions/reports/ scripts/",
+    "fmt": "deno fmt",
+    "fmt:check": "deno fmt --check",
+    "lint": "deno lint",
+    "lint:py": "uvx ruff@0.16.1 check payloads",
+    "typecheck:py": "uvx mypy@2.3.0 --check-untyped-defs --python-version 3.13 payloads",
+    "preflight": "deno run --allow-read --allow-run scripts/preflight.ts"
+  },
+  "imports": {
+    "@swamp-club/swamp-testing": "jsr:@swamp-club/swamp-testing@^0.20260729.29",
+    "zod": "npm:zod@4.3.6"
+  },
+  "fmt": {
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false,
+    "exclude": ["extensions/models/_payloads/"]
+  },
+  "lint": {
+    "exclude": ["extensions/models/_payloads/"],
+    "rules": {
+      "exclude": ["no-import-prefix"]
+    }
+  }
+}
