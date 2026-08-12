@@ -150,6 +150,7 @@ export const templateFileCheckFacts = z.object({
 /** Facts from template_file.py apply. */
 export const templateFileApplyFacts = templateFileCheckFacts.extend({
   changed: z.boolean(),
+  performed: z.array(z.string()),
   error: z.string().nullable(),
 });
 

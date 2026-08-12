@@ -116,13 +116,15 @@ function judge(g: GlobalArgs, expectedHash: string, facts: FileFacts) {
  *
  * apply pipeline per host: stage rendered bytes to a same-directory temp
  * file → run validateCommand against it ($FILE) → atomic os.replace → run
- * onChange only when the content hash changed (handler semantics). check
- * never stages anything: local render + remote hash/stat compare only,
- * via python hashlib/os.stat — no command-output parsing.
+ * onChange only when the content hash changed (handler semantics).
+ * Owner/mode drift without content drift converges in place (chown/chmod,
+ * no rewrite, no onChange) and reports `applied`. check never stages
+ * anything: local render + remote hash/stat compare only, via python
+ * hashlib/os.stat — no command-output parsing.
  */
 export const model = {
   type: "@psftw/pets/template-file",
-  version: "2026.08.12.3",
+  version: "2026.08.12.4",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {
@@ -237,10 +239,10 @@ export const model = {
                 (j.changes.length ? "drift remains after apply" : null);
               const status = error !== null
                 ? "failed"
-                : run.data.changed
+                : run.data.performed.length
                 ? "applied"
                 : "compliant";
-              const changes = run.data.changed ? [`write ${g.path}`] : [];
+              const changes = run.data.performed;
               logHostStatus(context, run.host, status, changes);
               handles.push(
                 await context.writeResource("state", run.host, {

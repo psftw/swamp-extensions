@@ -1,6 +1,6 @@
 manifestVersion: 1
 name: "@psftw/pets"
-version: "2026.08.12.3"
+version: "2026.08.12.4"
 repository: "https://github.com/psftw/swamp-extensions"
 description: |
   Minimalist configuration management for "pet" Debian Linux servers. Declare

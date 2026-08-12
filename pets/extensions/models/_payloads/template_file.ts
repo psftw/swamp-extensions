@@ -86,11 +86,21 @@ def _install(cfg: ApplyCfg, content):
         os.chmod(tmp, cfg["modeInt"])
         if cur.get("hash") == hashlib.sha256(content).hexdigest():
             os.unlink(tmp)
-            shutil.chown(cfg["path"], cfg["owner"], cfg["group"])
-            os.chmod(cfg["path"], cfg["modeInt"])
-            return False
+            performed = []
+            if (cur.get("owner"), cur.get("group")) != (
+                cfg["owner"],
+                cfg["group"],
+            ):
+                shutil.chown(cfg["path"], cfg["owner"], cfg["group"])
+                performed.append(
+                    "chown " + cfg["owner"] + ":" + cfg["group"] + " " + cfg["path"]
+                )
+            if cur.get("mode") != cfg["modeInt"]:
+                os.chmod(cfg["path"], cfg["modeInt"])
+                performed.append("chmod " + oct(cfg["modeInt"]) + " " + cfg["path"])
+            return False, performed
         os.replace(tmp, cfg["path"])
-        return True
+        return True, ["write " + cfg["path"]]
     except BaseException:
         try:
             os.unlink(tmp)
@@ -102,8 +112,9 @@ def _install(cfg: ApplyCfg, content):
 def apply(cfg: ApplyCfg):
     err = None
     changed = False
+    performed = []
     try:
-        changed = _install(cfg, base64.b64decode(cfg["contentB64"]))
+        changed, performed = _install(cfg, base64.b64decode(cfg["contentB64"]))
         if changed and cfg["onChange"]:
             r = subprocess.run(
                 cfg["onChange"], shell=True, capture_output=True, text=True
@@ -114,6 +125,7 @@ def apply(cfg: ApplyCfg):
         err = err or str(e)[:2000]
     out = gather(cfg)
     out["changed"] = changed
+    out["performed"] = performed
     out["error"] = err
     print(json.dumps(out))
 `;

@@ -73,6 +73,7 @@ function applyContext(
     group?: string;
     mode?: number;
     changed?: boolean;
+    performed?: string[];
     error?: string | null;
   },
 ) {
@@ -190,11 +191,13 @@ Deno.test("template_file.apply: compliant when the install was a no-op (hash alr
     group: "root",
     mode: 0o644,
     changed: false,
+    performed: [],
     error: null,
   });
   await model.methods.apply.execute({ hosts: "tag:all" }, context);
   const [written] = getWrittenResources();
   assertEquals(written.data.status, "compliant");
+  assertEquals(written.data.changes, []);
 });
 
 Deno.test("template_file.apply: applied when the file content changed", async () => {
@@ -206,11 +209,36 @@ Deno.test("template_file.apply: applied when the file content changed", async ()
     group: "root",
     mode: 0o644,
     changed: true,
+    performed: ["write /etc/hello.conf"],
     error: null,
   });
   await model.methods.apply.execute({ hosts: "tag:all" }, context);
   const [written] = getWrittenResources();
   assertEquals(written.data.status, "applied");
+  assertEquals(written.data.changes, ["write /etc/hello.conf"]);
+});
+
+Deno.test("template_file.apply: applied when only owner/mode converged (no content change, no onChange)", async () => {
+  const expectedHash = await sha256Hex(renderedText);
+  const performed = [
+    "chown root:root /etc/hello.conf",
+    "chmod 0o644 /etc/hello.conf",
+  ];
+  const { context, getWrittenResources } = applyContext({
+    exists: true,
+    hash: expectedHash,
+    owner: "root",
+    group: "root",
+    mode: 0o644,
+    changed: false,
+    performed,
+    error: null,
+  });
+  await model.methods.apply.execute({ hosts: "tag:all" }, context);
+  const [written] = getWrittenResources();
+  assertEquals(written.data.status, "applied");
+  assertEquals(written.data.changes, performed);
+  assertEquals(written.data.error, null);
 });
 
 Deno.test("template_file.check: rejects a runResult host absent from resolve, writing nothing", async () => {
