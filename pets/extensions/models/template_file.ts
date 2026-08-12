@@ -1,6 +1,7 @@
 import { z } from "npm:zod@4";
 import { Liquid } from "npm:liquidjs@10.28.0";
 import {
+  base64Utf8,
   errorMessage,
   type FleetContext,
   fleetFacts,
@@ -121,7 +122,7 @@ function judge(g: GlobalArgs, expectedHash: string, facts: FileFacts) {
  */
 export const model = {
   type: "@psftw/pets/template-file",
-  version: "2026.08.12.2",
+  version: "2026.08.12.3",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {
@@ -209,7 +210,7 @@ export const model = {
               templateFileApplyCfg,
               {
                 path: g.path,
-                contentB64: btoa(text),
+                contentB64: base64Utf8(text),
                 owner: g.owner,
                 group: g.group,
                 modeInt: normalizeMode(g.mode),

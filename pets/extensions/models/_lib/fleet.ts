@@ -211,6 +211,18 @@ export function normalizeMode(mode: string): number {
   return parseInt(mode, 8);
 }
 
+/**
+ * Base64 of the UTF-8 bytes, matching base64.b64decode → raw file bytes on
+ * the payload side. Bare btoa is Latin1-only: it throws on multibyte content
+ * and would ship bytes that never match sha256Hex's UTF-8 hash.
+ */
+export function base64Utf8(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 /** Hex SHA-256, matching hashlib.sha256().hexdigest() on the payload side. */
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest(

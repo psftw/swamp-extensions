@@ -172,7 +172,7 @@ async function writeSummary(
  */
 export const model = {
   type: "@psftw/pets/role",
-  version: "2026.08.12.2",
+  version: "2026.08.12.3",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {

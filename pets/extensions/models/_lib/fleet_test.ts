@@ -1,6 +1,7 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1";
 import { z } from "npm:zod@4";
 import {
+  base64Utf8,
   errorMessage,
   fleetFacts,
   fleetResolve,
@@ -290,6 +291,13 @@ Deno.test("sha256Hex matches known vectors", async () => {
     await sha256Hex(""),
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   );
+});
+
+Deno.test("base64Utf8 encodes UTF-8 bytes, agreeing with btoa on ASCII", () => {
+  assertEquals(base64Utf8("hello\n"), btoa("hello\n"));
+  // em dash U+2014 → UTF-8 e2 80 94; bare btoa throws on it
+  assertEquals(base64Utf8("—"), "4oCU");
+  assertThrows(() => btoa("—"));
 });
 
 Deno.test("errorMessage unwraps Error, stringifies non-Error", () => {
