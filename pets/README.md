@@ -160,7 +160,7 @@ transport doesn't conform.
 ## Development
 
 ```sh
-deno task preflight
+deno task release
 ```
 
 `payloads/*.py` are the source of truth for payload logic;
@@ -177,10 +177,12 @@ contract.
 everything above `## How it works` — which lands on the
 [extension page](https://swamp-club.com/extensions/@psftw/pets).
 
-`deno task preflight` regenerates the description, runs every local check, plus
-the registry-side ones (manifest format, quality score, push dry-run with the
-adversarial-review gate) and prints one pass/fail summary. Pass a channel for
-prerelease validation: `deno task preflight --channel beta`.
+`deno task release` regenerates the description, runs every local check, plus
+the registry-side ones (manifest format, version bump, release notes from the
+CHANGELOG entry, quality score, push dry-run with the adversarial-review gate),
+prints one pass/fail summary, and — when everything passes — asks for
+confirmation before pushing (beta channel unless `--channel rc|stable`). See
+[RELEASING.md](./RELEASING.md).
 
 ## License
 
