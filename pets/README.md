@@ -174,10 +174,7 @@ it leaves the model, and `typecheck:py` holds the Python side to the same
 contract.
 
 `deno task gen:docs` rebuilds the `manifest.yaml` description from this README —
-everything above `## How it works` — followed by an API reference generated from
-the model and report modules (zod schemas rendered via JSON Schema; each
-module's first JSDoc paragraph is its published summary). The published
-reference lands on the
+everything above `## How it works` — which lands on the
 [extension page](https://swamp-club.com/extensions/@psftw/pets).
 
 `deno task preflight` regenerates the description, runs every local check, plus

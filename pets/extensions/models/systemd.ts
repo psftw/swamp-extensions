@@ -69,7 +69,7 @@ function drift(g: GlobalArgs, facts: UnitFacts): string[] {
  */
 export const model = {
   type: "@psftw/pets/systemd",
-  version: "2026.08.12.1",
+  version: "2026.08.12.2",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {

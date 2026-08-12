@@ -72,7 +72,7 @@ function stateOf(g: GlobalArgs, facts: MemberFacts) {
  */
 export const model = {
   type: "@psftw/pets/group-member",
-  version: "2026.08.12.1",
+  version: "2026.08.12.2",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {

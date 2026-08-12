@@ -55,7 +55,7 @@ function missingOf(
  */
 export const model = {
   type: "@psftw/pets/apt",
-  version: "2026.08.12.1",
+  version: "2026.08.12.2",
   globalArguments: GlobalArgsSchema,
   inputsSchema: z.object({}),
   resources: {
